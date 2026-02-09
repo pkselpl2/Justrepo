@@ -2,96 +2,164 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>텍스트 타이핑 GIF 생성기</title>
+<title>타이핑 GIF + 글자 수 계산</title>
 <style>
   body {
-    background: #1e1e1e;
-    color: #00ff00;
+    background: #111;
+    color: #0f0;
     font-family: monospace;
-    font-size: 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 50px;
-  }
-  #text {
-    white-space: pre;
-    margin-top: 20px;
     padding: 20px;
-    border: 2px solid #00ff00;
-    min-height: 100px;
-    width: 600px;
   }
   textarea {
-    width: 600px;
-    height: 150px;
-    font-family: monospace;
-    font-size: 18px;
-    padding: 10px;
-    margin-bottom: 10px;
+    width: 90%;
+    height: 200px;
+    font-size: 16px;
     background: #000;
     color: #0f0;
+    padding: 10px;
     border: 2px solid #0f0;
+    margin-bottom: 10px;
   }
   button {
     padding: 10px 20px;
-    font-size: 18px;
+    font-size: 16px;
     background: #0f0;
     color: #000;
     border: none;
     cursor: pointer;
-    margin-bottom: 20px;
+    margin: 5px;
+  }
+  #textContainer {
+    width: 90%;
+    min-height: 400px;
+    border: 2px solid #0f0;
+    overflow: hidden;
+    position: relative;
+    padding: 10px;
+    line-height: 1.4em;
+    background: #111;
+  }
+  .line {
+    position: relative;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transform: translateY(0);
+  }
+  #result {
+    margin-bottom: 10px;
   }
 </style>
 </head>
 <body>
 
-<h1>텍스트 타이핑 GIF 생성기</h1>
-<textarea id="inputText" placeholder="여기에 원하는 텍스트를 입력하세요..."></textarea>
-<button id="startBtn">GIF 생성!</button>
-<div id="text"></div>
+<h2>타이핑 GIF + 글자 수 계산</h2>
+<textarea id="inputText" placeholder="텍스트를 붙여넣으세요..."></textarea>
+<div>
+  <button id="startBtn">시작!</button>
+  <button id="downloadGifBtn">GIF 다운로드</button>
+</div>
+<div id="result"></div>
+<div id="textContainer"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js"></script>
+<!-- html2canvas + gif.js -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+
 <script>
-const container = document.getElementById("text");
 const button = document.getElementById("startBtn");
+const container = document.getElementById("textContainer");
+const resultDiv = document.getElementById("result");
+let frames = []; // GIF용 프레임 저장
 
-button.addEventListener('click', () => {
-  const content = document.getElementById("inputText").value;
-  if (!content) return alert("텍스트를 입력해주세요!");
+async function typeLine(line, speed = 30) {
+  return new Promise(resolve => {
+    const div = document.createElement("div");
+    div.className = "line";
+    container.appendChild(div);
+    let i = 0;
+    function typeChar() {
+      if (i < line.length) {
+        div.textContent += line[i];
+        i++;
+        setTimeout(typeChar, speed);
+      } else {
+        resolve(div);
+      }
+    }
+    typeChar();
+  });
+}
 
-  container.textContent = "";
-  let index = 0;
+async function startTyping() {
+  const text = document.getElementById("inputText").value;
+  if (!text) return alert("텍스트를 입력하세요!");
+
+  // 글자 수 계산
+  const totalChars = text.length;
+  const noSpaces = text.replace(/\s/g, '').length;
+  const linesCount = text.split('\n').length;
+  resultDiv.innerHTML = `
+    총 글자 수(공백 포함): <b>${totalChars}</b><br>
+    총 글자 수(공백 제외): <b>${noSpaces}</b><br>
+    줄 수: <b>${linesCount}</b>
+  `;
+
+  container.innerHTML = "";
+  frames = [];
+
+  const lines = text.split('\n');
+
+  for (let line of lines) {
+    const lineDiv = await typeLine(line, 30);
+
+    // 이전 글자를 위로 올리기
+    const allLines = container.querySelectorAll(".line");
+    let offset = 0;
+    allLines.forEach(l => {
+      l.style.transform = `translateY(${-offset}px)`;
+      l.style.transition = "transform 0.3s";
+      offset += l.offsetHeight + 4; // 줄 간격
+    });
+
+    // GIF 프레임 저장
+    await html2canvas(container).then(canvas => {
+      frames.push(canvas);
+    });
+  }
+
+  alert("타이핑 완료! GIF 다운로드 가능.");
+}
+
+async function downloadGIF() {
+  if (frames.length === 0) return alert("먼저 타이핑을 실행하세요!");
 
   const gif = new GIF({
     workers: 2,
-    quality: 10
+    quality: 10,
+    width: container.offsetWidth,
+    height: container.offsetHeight
   });
 
-  function typeNext() {
-    if (index <= content.length) {
-      container.textContent = content.slice(0, index);
-      index++;
+  frames.forEach(frame => {
+    gif.addFrame(frame, {delay: 200});
+  });
 
-      html2canvas(container).then(canvas => {
-        gif.addFrame(canvas, {delay: 100});
-        typeNext();
-      });
-    } else {
-      gif.on('finished', function(blob) {
-        const url = URL.createObjectURL(blob);
-        const img = document.createElement('img');
-        img.src = url;
-        container.innerHTML = ''; // 기존 텍스트 제거
-        container.appendChild(img);
-      });
-      gif.render();
-    }
-  }
+  gif.on('finished', function(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'typing.gif';
+    a.click();
+  });
 
-  typeNext();
-});
+  gif.render();
+}
+
+button.addEventListener("click", startTyping);
+document.getElementById("downloadGifBtn").addEventListener("click", downloadGIF);
 </script>
 
 </body>
