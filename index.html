@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>텍스트 타이핑 GIF 생성기</title>
+<style>
+  body {
+    background: #1e1e1e;
+    color: #00ff00;
+    font-family: monospace;
+    font-size: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 50px;
+  }
+  #text {
+    white-space: pre;
+    margin-top: 20px;
+    padding: 20px;
+    border: 2px solid #00ff00;
+    min-height: 100px;
+    width: 600px;
+  }
+  textarea {
+    width: 600px;
+    height: 150px;
+    font-family: monospace;
+    font-size: 18px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #000;
+    color: #0f0;
+    border: 2px solid #0f0;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 18px;
+    background: #0f0;
+    color: #000;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1>텍스트 타이핑 GIF 생성기</h1>
+<textarea id="inputText" placeholder="여기에 원하는 텍스트를 입력하세요..."></textarea>
+<button id="startBtn">GIF 생성!</button>
+<div id="text"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.min.js"></script>
+<script>
+const container = document.getElementById("text");
+const button = document.getElementById("startBtn");
+
+button.addEventListener('click', () => {
+  const content = document.getElementById("inputText").value;
+  if (!content) return alert("텍스트를 입력해주세요!");
+
+  container.textContent = "";
+  let index = 0;
+
+  const gif = new GIF({
+    workers: 2,
+    quality: 10
+  });
+
+  function typeNext() {
+    if (index <= content.length) {
+      container.textContent = content.slice(0, index);
+      index++;
+
+      html2canvas(container).then(canvas => {
+        gif.addFrame(canvas, {delay: 100});
+        typeNext();
+      });
+    } else {
+      gif.on('finished', function(blob) {
+        const url = URL.createObjectURL(blob);
+        const img = document.createElement('img');
+        img.src = url;
+        container.innerHTML = ''; // 기존 텍스트 제거
+        container.appendChild(img);
+      });
+      gif.render();
+    }
+  }
+
+  typeNext();
+});
+</script>
+
+</body>
+</html>
